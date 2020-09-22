@@ -1,5 +1,5 @@
 ### Python Example Application
-An example application that demonstrate simple SSI use-cases using the Python Verity SDK. 
+An example application that demonstrate using the Python Verity SDK to build a patient held list of verified Medications
 
 See [Getting Started](../../../docs/getting-started/getting-started.md) guide for a guided tutorial that makes use of this example application.  
 

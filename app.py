@@ -30,8 +30,8 @@ import aiohttp_session.cookie_storage as cookie_storage
 INSTITUTION_NAME = 'Faber College'
 LOGO_URL = 'http://robohash.org/235'
 
-SCHEMA_ID = "UMNNKgnk8cF4mxGjzNGq1A:2:Diploma:751.549.757"
-CRED_DEF_ID = "UMNNKgnk8cF4mxGjzNGq1A:3:CL:144000:latest"
+SCHEMA_ID = "UMNNKgnk8cF4mxGjzNGq1A:2:Medication:896.476.774"
+CRED_DEF_ID = "UMNNKgnk8cF4mxGjzNGq1A:3:CL:144237:latest"
 
 context: Context
 issuer_did: str = ''
@@ -260,21 +260,23 @@ async def write_ledger_cred_def(loop, schema_id: str) -> str:
     cred_def_id = await first_step  # wait for operation to be complete
     return cred_def_id  # returns ledger cred def identifier
 
-async def issue_credential(loop, rel_did, cred_def_id,comment="Joe Smith"):
+async def issue_credential(loop, rel_did, cred_def_id,cred_data=None):
     # input parameters for issue credential
     credential_name = 'Medication'
-    credential_data = {'Medication Snomed':'324095003',
-                        'Medication Display':'Oxytetracycline 250mg tablets', 
-                        'Repeat Frequency':'1',
-                        'Repeat Period':'6',
-                        'Repeat Unit':'h',
-                        'Route Snomed':'26643006',
-                        'Route Display':'Oral',
-                        'Dose Quantity':'1',
-                        'Dose Unit':'Tablet'}
-
+    if cred_data == None:
+        credential_data = {'Medication Snomed':'324095003',
+                            'Medication Display':'Oxytetracycline 250mg tablets', 
+                            'Repeat Frequency':'1',
+                            'Repeat Period':'6',
+                            'Repeat Unit':'h',
+                            'Route Snomed':'26643006',
+                            'Route Display':'Oral',
+                            'Dose Quantity':'1',
+                            'Dose Unit':'Tablet'}
+    else:
+        credential_data = cred_data
     # constructor for the Issue Credential protocol
-    issue = IssueCredential(rel_did, None, cred_def_id, credential_data, comment, 0, True)
+    issue = IssueCredential(rel_did, None, cred_def_id, credential_data, "Medication Prescribtion", 0, True)
 
     offer_sent = loop.create_future()
     cred_sent = loop.create_future()
@@ -575,23 +577,32 @@ async def completeconnect(request):
 
 @routes.get('/prescribe')
 async def prescribe(request):
-    loop = asyncio.get_event_loop()
-    await create_connection(loop)
     raise web.HTTPFound('/static/prescribe.html')
 
-@routes.get('/issue')
+@routes.post('/issue')
 async def issue(request):
     loop = asyncio.get_event_loop()
     # TODO - Store this so we don't need to keep remaking it?
-    schema_id = await write_ledger_schema(loop)
+    schema_id = SCHEMA_ID#await write_ledger_schema(loop)
 
     # TODO - Store this so we don't need to keep remaking it?
-    cred_def_id = await write_ledger_cred_def(loop, schema_id)
+    cred_def_id = CRED_DEF_ID#await write_ledger_cred_def(loop, schema_id)
+
+    post_data = await request.post()
     session = await aiohttp_session.get_session(request)
     rel_did = session['rel_did']
+    cred_data = {'Medication Snomed':post_data["medsnomed"],
+                    'Medication Display':post_data["meddisplay"], 
+                    'Repeat Frequency':post_data["repfreq"],
+                    'Repeat Period':post_data["repperiod"],
+                    'Repeat Unit':post_data["repunit"],
+                    'Route Snomed':post_data["routesnomed"],
+                    'Route Display':post_data["routedisplay"],
+                    'Dose Quantity':post_data["dosequantity"],
+                    'Dose Unit':post_data["doseunit"]}
 
-    await issue_credential(loop, rel_did, cred_def_id)
-     raise web.HTTPFound('/static/prescribed.html')
+    await issue_credential(loop, rel_did, cred_def_id, cred_data)
+    raise web.HTTPFound('/static/prescribed.html')
 
 @routes.get('/request')
 async def index(request):

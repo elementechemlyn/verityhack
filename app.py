@@ -21,10 +21,17 @@ from verity_sdk.protocols.v1_0.Connecting import Connecting
 from verity_sdk.protocols.v1_0.IssueCredential import IssueCredential
 from verity_sdk.protocols.v1_0.PresentProof import PresentProof
 from verity_sdk.protocols.v1_0.Relationship import Relationship
+from verity_sdk.protocols.v1_0.OutOfBand import OutOfBand
 from verity_sdk.utils.Context import Context
+
+import aiohttp_session 
+import aiohttp_session.cookie_storage as cookie_storage
 
 INSTITUTION_NAME = 'Faber College'
 LOGO_URL = 'http://robohash.org/235'
+
+SCHEMA_ID = "UMNNKgnk8cF4mxGjzNGq1A:2:Diploma:751.549.757"
+CRED_DEF_ID = "UMNNKgnk8cF4mxGjzNGq1A:3:CL:144000:latest"
 
 context: Context
 issuer_did: str = ''
@@ -71,7 +78,6 @@ async def create_relationship(loop) -> str:
 
     # Constructor for the Relationship API
     relationship: Relationship = Relationship(label='inviter')
-
     rel_did = loop.create_future()
     thread_id = loop.create_future()
 
@@ -110,7 +116,7 @@ async def create_relationship(loop) -> str:
             invite_url = message["inviteURL"]
             # write QRCode to disk
             qr = pyqrcode.create(invite_url)
-            qr.png('qrcode.png')
+            qr.png('static/qrcode.png')
 
             if os.environ.get("HTTP_SERVER_URL"):
                 print('Open the following URL in your browser and scan presented QR code')
@@ -185,9 +191,12 @@ async def create_connection(loop):
 
 async def write_ledger_schema(loop) -> str:
     # input parameters for schema
-    schema_name = 'Diploma'
+    schema_name = 'Medication'
     schema_version = get_random_version()
-    schema_attrs = ['name', 'degree']
+    schema_attrs = ['Medication Snomed', 'Medication Display', 
+                    'Repeat Frequency','Repeat Period','Repeat Unit',
+                    'Route Snomed','Route Display',
+                    'Dose Quantity','Dose Unit']
 
     # constructor for the Write Schema protocol
     schema = WriteSchema(schema_name, schema_version, schema_attrs)
@@ -218,7 +227,7 @@ async def write_ledger_schema(loop) -> str:
 
 async def write_ledger_cred_def(loop, schema_id: str) -> str:
     # input parameters for cred definition
-    cred_def_name = 'Trinity College Diplomas'
+    cred_def_name = 'Some Prescribing Org'
     cred_def_tag = 'latest'
 
     # constructor for the Write Credential Definition protocol
@@ -251,42 +260,21 @@ async def write_ledger_cred_def(loop, schema_id: str) -> str:
     cred_def_id = await first_step  # wait for operation to be complete
     return cred_def_id  # returns ledger cred def identifier
 
-
-# async def ask_question(loop, for_did):
-#     question_text = 'Hi Alice, how are you today?'
-#     question_detail = 'Checking up on you today.'
-#     valid_responses = ['Great!', 'Not so good.']
-#
-#     question = CommittedAnswer(for_did, None, question_text, question_detail, valid_responses, True)
-#     first_step = loop.create_future()
-#
-#     spinner = make_spinner('Waiting for Connect.Me to answer the question')  # Console spinner
-#
-#     async def receive_answer(msg_name, message):
-#         spinner.stop_and_persist('Done')
-#         print_message(msg_name, message)
-#         if msg_name == CommittedAnswer.ANSWER_GIVEN:
-#             first_step.set_result(None)
-#         else:
-#             non_handled(f'Message name is not handled - {msg_name}', message)
-#
-#     handlers.add_handler(CommittedAnswer.MSG_FAMILY, CommittedAnswer.MSG_FAMILY_VERSION, receive_answer)
-#
-#     spinner.start()
-#
-#     await question.ask(context)
-
-
-async def issue_credential(loop, rel_did, cred_def_id):
+async def issue_credential(loop, rel_did, cred_def_id,comment="Joe Smith"):
     # input parameters for issue credential
-    credential_name = 'Degree'
-    credential_data = {
-        'name': 'Joe Smith',
-        'degree': 'Bachelors'
-    }
+    credential_name = 'Medication'
+    credential_data = {'Medication Snomed':'324095003',
+                        'Medication Display':'Oxytetracycline 250mg tablets', 
+                        'Repeat Frequency':'1',
+                        'Repeat Period':'6',
+                        'Repeat Unit':'h',
+                        'Route Snomed':'26643006',
+                        'Route Display':'Oral',
+                        'Dose Quantity':'1',
+                        'Dose Unit':'Tablet'}
 
     # constructor for the Issue Credential protocol
-    issue = IssueCredential(rel_did, None, cred_def_id, credential_data, 'comment', 0, True)
+    issue = IssueCredential(rel_did, None, cred_def_id, credential_data, comment, 0, True)
 
     offer_sent = loop.create_future()
     cred_sent = loop.create_future()
@@ -332,16 +320,44 @@ async def request_proof(loop, for_did):
     global issuer_did
 
     # input parameters for request proof
-    proof_name = 'Proof of Degree'
+    proof_name = 'Medication List'
     proof_attrs = [
         {
-            'name': 'name',
+            'name': 'Medication Snomed',
             'restrictions': [{'issuer_did': issuer_did}]
         },
         {
-            'name': 'degree',
+            'name': 'Medication Display',
             'restrictions': [{'issuer_did': issuer_did}]
-        }
+        },
+        {
+            'name': 'Repeat Frequency',
+            'restrictions': [{'issuer_did': issuer_did}]
+        },
+        {
+            'name': 'Repeat Period',
+            'restrictions': [{'issuer_did': issuer_did}]
+        },
+        {
+            'name': 'Repeat Unit',
+            'restrictions': [{'issuer_did': issuer_did}]
+        },
+        {
+            'name': 'Route Snomed',
+            'restrictions': [{'issuer_did': issuer_did}]
+        },
+        {
+            'name': 'Route Display',
+            'restrictions': [{'issuer_did': issuer_did}]
+        },
+        {
+            'name': 'Dose Quantity',
+            'restrictions': [{'issuer_did': issuer_did}]
+        },
+        {
+            'name': 'Dose Unit',
+            'restrictions': [{'issuer_did': issuer_did}]
+        },
     ]
 
     # constructor for the Present Proof protocol
@@ -539,6 +555,55 @@ async def setup_issuer(loop):
 
     await first_step  # wait for request to complete
 
+@routes.get('/')
+async def index(request):
+    raise web.HTTPFound('/static/index.html')
+
+@routes.get('/connect')
+async def index(request):
+    loop = asyncio.get_event_loop()
+    rel_did = await create_relationship(loop)
+    session = await aiohttp_session.get_session(request)
+    session['rel_did'] = rel_did
+    raise web.HTTPFound('/static/qrcode.html')
+
+@routes.get('/completeconnect')
+async def completeconnect(request):
+    loop = asyncio.get_event_loop()
+    await create_connection(loop)
+    raise web.HTTPFound('/static/connectioncomplete.html')
+
+@routes.get('/prescribe')
+async def prescribe(request):
+    loop = asyncio.get_event_loop()
+    await create_connection(loop)
+    raise web.HTTPFound('/static/prescribe.html')
+
+@routes.get('/issue')
+async def issue(request):
+    loop = asyncio.get_event_loop()
+    # TODO - Store this so we don't need to keep remaking it?
+    schema_id = await write_ledger_schema(loop)
+
+    # TODO - Store this so we don't need to keep remaking it?
+    cred_def_id = await write_ledger_cred_def(loop, schema_id)
+    session = await aiohttp_session.get_session(request)
+    rel_did = session['rel_did']
+
+    await issue_credential(loop, rel_did, cred_def_id)
+     raise web.HTTPFound('/static/prescribed.html')
+
+@routes.get('/request')
+async def index(request):
+    loop = asyncio.get_event_loop()
+    session = await aiohttp_session.get_session(request)
+    rel_did = session['rel_did']
+    await request_proof(loop,rel_did)
+    return web.Response(text='Got Proof?')
+
+@routes.get('/revoke')
+async def index(request):
+    return web.Response(text='Hello World!!!!')
 
 @routes.post('/')
 async def endpoint_handler(request):
@@ -556,13 +621,16 @@ async def main(loop):
 
     app = web.Application(loop=loop)
     app.add_routes(routes)
-
+    app.router.add_static("/static/","static")
+    aiohttp_session.setup(app, cookie_storage.EncryptedCookieStorage(b'Thirty  two  length  bytes  key.'))
     # noinspection PyDeprecation
     server = await loop.create_server(app.make_handler(), '0.0.0.0', port)
 
     print('Listening on port {}'.format(port))
-    await loop.create_task(example(loop))
-
+    #await loop.create_task(example(loop))
+    logging.info('Starting setup')
+    await setup(loop)
+    await asyncio.sleep(100*3600)
 
 if __name__ == '__main__':
     mainloop = asyncio.get_event_loop()

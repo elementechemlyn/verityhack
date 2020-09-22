@@ -26,6 +26,8 @@ from verity_sdk.utils.Context import Context
 
 import aiohttp_session 
 import aiohttp_session.cookie_storage as cookie_storage
+import aiohttp_jinja2
+import jinja2
 
 INSTITUTION_NAME = 'Faber College'
 LOGO_URL = 'http://robohash.org/235'
@@ -373,7 +375,7 @@ async def request_proof(loop, for_did):
         spinner.stop_and_persist('Done')
         print_message(msg_name, message)
         if msg_name == PresentProof.PRESENTATION_RESULT:
-            first_step.set_result(None)  # proof data contained inside `message`
+            first_step.set_result(message)  # proof data contained inside `message`
         else:
             non_handled(f'Message name is not handled - {msg_name}', message)
 
@@ -384,8 +386,8 @@ async def request_proof(loop, for_did):
 
     # request proof
     await proof.request(context)
-    await first_step  # wait for connect.me user to present the requested proof
-
+    message = await first_step  # wait for connect.me user to present the requested proof
+    return message
 
 async def setup(loop):
     global context
@@ -609,8 +611,12 @@ async def index(request):
     loop = asyncio.get_event_loop()
     session = await aiohttp_session.get_session(request)
     rel_did = session['rel_did']
-    await request_proof(loop,rel_did)
-    return web.Response(text='Got Proof?')
+    data = await request_proof(loop,rel_did)
+    response = aiohttp_jinja2.render_template('review.jinja2',
+                                            request,
+                                            data)
+
+    return response #web.Response(text="%s" % response)
 
 @routes.get('/revoke')
 async def index(request):
@@ -634,6 +640,7 @@ async def main(loop):
     app.add_routes(routes)
     app.router.add_static("/static/","static")
     aiohttp_session.setup(app, cookie_storage.EncryptedCookieStorage(b'Thirty  two  length  bytes  key.'))
+    aiohttp_jinja2.setup(app,loader=jinja2.FileSystemLoader('static'))
     # noinspection PyDeprecation
     server = await loop.create_server(app.make_handler(), '0.0.0.0', port)
 

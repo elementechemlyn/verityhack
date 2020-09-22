@@ -20,3 +20,12 @@ pip3 install -r requirements.txt
 ```sh
 python3 app.py
 ```
+
+### Use the application
+* Visit http://localhost:4000 for the menu page
+* Choose "Check in Patient" to create the connection to the patient (Scan QR Code etc)
+* Choose "Prescribe Medication" to fill in a form and issue the medication to the patient
+
+### TODO
+* Choose "Review Medications" to request "proof" of medication list and view medications
+* Choose "Withdraw Medication" to revoke a medication

@@ -48,28 +48,6 @@ handlers.add_handler('trust_ping', '1.0', noop)
 routes: RouteTableDef = web.RouteTableDef()
 
 
-async def example(loop):
-    logging.info('Starting setup')
-    await setup(loop)
-
-    rel_did = await create_relationship(loop)
-    # TODO - Check for an existing connection?
-
-    await create_connection(loop)
-
-    # await ask_question(loop, for_did)
-
-    # TODO - Store this so we don't need ot keep remaking it
-    schema_id = await write_ledger_schema(loop)
-
-    # TODO - Store this so we don't need ot keep remaking it
-    cred_def_id = await write_ledger_cred_def(loop, schema_id)
-
-    #await issue_credential(loop, rel_did, cred_def_id)
-
-    #await request_proof(loop, rel_did)
-
-
 async def create_relationship(loop) -> str:
     global context
     global handlers
@@ -198,7 +176,7 @@ async def write_ledger_schema(loop) -> str:
     schema_attrs = ['Medication Snomed', 'Medication Display', 
                     'Repeat Frequency','Repeat Period','Repeat Unit',
                     'Route Snomed','Route Display',
-                    'Dose Quantity','Dose Unit']
+                    'Dose Quantity','Dose Unit' , 'PODS URL']
 
     # constructor for the Write Schema protocol
     schema = WriteSchema(schema_name, schema_version, schema_attrs)
@@ -274,11 +252,12 @@ async def issue_credential(loop, rel_did, cred_def_id,cred_data=None):
                             'Route Snomed':'26643006',
                             'Route Display':'Oral',
                             'Dose Quantity':'1',
-                            'Dose Unit':'Tablet'}
+                            'Dose Unit':'Tablet',
+                            'PODS URL':'some.url'}
     else:
         credential_data = cred_data
     # constructor for the Issue Credential protocol
-    issue = IssueCredential(rel_did, None, cred_def_id, credential_data, "Medication Prescribtion", 0, True)
+    issue = IssueCredential(rel_did, None, cred_def_id, credential_data, "Vaccination Confirmation", 0, True)
 
     offer_sent = loop.create_future()
     cred_sent = loop.create_future()
@@ -360,6 +339,10 @@ async def request_proof(loop, for_did):
         },
         {
             'name': 'Dose Unit',
+            'restrictions': [{'issuer_did': issuer_did}]
+        },
+        {
+            'name': 'PODS URL',
             'restrictions': [{'issuer_did': issuer_did}]
         },
     ]
@@ -585,10 +568,12 @@ async def prescribe(request):
 async def issue(request):
     loop = asyncio.get_event_loop()
     # TODO - Store this so we don't need to keep remaking it?
-    schema_id = SCHEMA_ID#await write_ledger_schema(loop)
+    schema_id = SCHEMA_ID
+    #await write_ledger_schema(loop)
 
     # TODO - Store this so we don't need to keep remaking it?
-    cred_def_id = CRED_DEF_ID#await write_ledger_cred_def(loop, schema_id)
+    cred_def_id = CRED_DEF_ID
+    #await write_ledger_cred_def(loop, schema_id)
 
     post_data = await request.post()
     session = await aiohttp_session.get_session(request)
@@ -601,7 +586,8 @@ async def issue(request):
                     'Route Snomed':post_data["routesnomed"],
                     'Route Display':post_data["routedisplay"],
                     'Dose Quantity':post_data["dosequantity"],
-                    'Dose Unit':post_data["doseunit"]}
+                    'Dose Unit':post_data["doseunit"],
+                    'PODS URL':post_data["podsurl"] }
 
     await issue_credential(loop, rel_did, cred_def_id, cred_data)
     raise web.HTTPFound('/static/prescribed.html')
@@ -619,7 +605,7 @@ async def index(request):
     return response #web.Response(text="%s" % response)
 
 @routes.get('/revoke')
-async def index(request):
+async def revoke(request):
     return web.Response(text='Hello World!!!!')
 
 @routes.post('/')
